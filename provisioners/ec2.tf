@@ -1,18 +1,41 @@
 resource "aws_instance" "roboshop" {
-    count = length(var.instances)
     ami           = var.ami_id #left and right side names no need to same
-    instance_type = var.environment == "dev" ? "t3.micro" : "t3.small"
+    instance_type = var.instance_type
     vpc_security_group_ids = [ aws_security_group.allow-all-terraform.id ]
-    tags = merge( var.common_tags,
+    tags = merge(
+        var.ec2_tags,
         {
-            Component = var.instances[count.index]
-            Name = var.instances[count.index]
+            Password = var.co_password
         }
     )
-    
-    /* {
-        Name = var.instances[count.index]
+   /*  provisioner "local-exec" {
+      command = "echo ${self.private_ip} > inventory"
+      on_failure = continue #ignoring errors
+    }
+
+    provisioner "local-exec" {
+        command = "echo 'instance is destroyed'"
+        when = destroy
     } */
+    connection {
+        type = "ssh"
+        user = "ec2-user"
+        password = self.tags.Password
+        host = self.public_ip
+    }
+    provisioner "remote-exec" {
+        inline = [ 
+            "sudo dnf install nginx -y",
+            "sudo systemctl start nginx"
+        ]
+    }
+
+    provisioner "remote-exec" {
+        when = destroy
+        inline = [ 
+            "sudo systemctl stop nginx"
+         ]
+    }
 }
 
 resource "aws_security_group" "allow-all-terraform" {
@@ -32,11 +55,5 @@ resource "aws_security_group" "allow-all-terraform" {
         cidr_blocks      = var.sg_cidr_blocks
         ipv6_cidr_blocks = ["::/0"]
     }
-    tags = merge(
-        var.common_tags,
-        {
-            Name = "allow-all"
-        }
-    )
-    #var.sg_tags
+    tags = var.sg_tags
 }

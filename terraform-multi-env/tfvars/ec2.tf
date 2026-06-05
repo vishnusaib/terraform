@@ -1,22 +1,20 @@
 resource "aws_instance" "roboshop" {
     count = length(var.instances)
     ami           = var.ami_id #left and right side names no need to same
-    instance_type = var.environment == "dev" ? "t3.micro" : "t3.small"
+    instance_type = var.instance_type
     vpc_security_group_ids = [ aws_security_group.allow-all-terraform.id ]
-    tags = merge( var.common_tags,
-        {
-            Component = var.instances[count.index]
-            Name = var.instances[count.index]
-        }
+    tags = merge(
+        var.common_tags,
+    {
+        Name = "${var.instances[count.index]}-${var.environment}"
+        Component = var.instances[count.index]
+        Environment = var.environment
+    }
     )
-    
-    /* {
-        Name = var.instances[count.index]
-    } */
 }
 
 resource "aws_security_group" "allow-all-terraform" {
-    name = var.sg_name
+    name = "${var.sg_name}-${var.environment}"
     description = var.sg_description
     ingress {
         from_port        = var.sg_from_port
@@ -35,8 +33,7 @@ resource "aws_security_group" "allow-all-terraform" {
     tags = merge(
         var.common_tags,
         {
-            Name = "allow-all"
+            Name = "${var.sg_name}-${var.environment}"
         }
     )
-    #var.sg_tags
 }
